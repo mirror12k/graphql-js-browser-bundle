@@ -44,4 +44,4 @@ jobs:
       run: |
         gh secret set LAST_CHECKED_RELEASE -b"${{ steps.get_latest_release.outputs.latest_release }}" --repo YOUR_USERNAME/YOUR_REPOSITORY
       env:
-        GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
