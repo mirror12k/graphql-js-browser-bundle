@@ -2,7 +2,7 @@ name: Check for New Releases
 
 on:
   schedule:
-    - cron: '0 0 * * MON'
+    - cron: '0 0 * * MON' # Runs every Monday at midnight
   workflow_dispatch:
   push:
 
@@ -14,34 +14,29 @@ jobs:
     - name: Check out the repository
       uses: actions/checkout@v2
 
-    - name: Get the latest release
-      id: get_latest_release
+    - name: Get the latest release of graphql-js
+      id: get_latest_graphql_js_release
       run: |
-        latest_release=$(curl -s https://api.github.com/repos/graphql/graphql-js/releases/latest | jq -r .tag_name)
-        echo "::set-output name=latest_release::$latest_release"
+        latest_graphql_js_release=$(curl -s https://api.github.com/repos/graphql/graphql-js/releases/latest | jq -r .tag_name)
+        echo "::set-output name=latest_graphql_js_release::$latest_graphql_js_release"
 
-    - name: Get the last checked release
-      id: get_last_checked_release
-      run: echo "::set-output name=last_checked_release::${{ secrets.LAST_CHECKED_RELEASE }}"
+    - name: Get the latest release of this repository
+      id: get_latest_own_release
+      run: |
+        latest_own_release=$(curl -s https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r .tag_name)
+        echo "::set-output name=latest_own_release::$latest_own_release"
 
     - name: Compare releases
       id: compare_releases
       run: |
-        if [ "${{ steps.get_latest_release.outputs.latest_release }}" != "${{ steps.get_last_checked_release.outputs.last_checked_release }}" ]; then
-          echo "New release detected"
+        if [ "${{ steps.get_latest_graphql_js_release.outputs.latest_graphql_js_release }}" != "${{ steps.get_latest_own_release.outputs.latest_own_release }}" ]; then
+          echo "New release detected in graphql-js"
           echo "::set-output name=new_release::true"
         else
-          echo "No new release"
+          echo "No new release detected in graphql-js"
           echo "::set-output name=new_release::false"
         fi
 
     - name: Trigger build if new release is detected
       if: steps.compare_releases.outputs.new_release == 'true'
       run: echo "Trigger your build or workflow here"
-
-    - name: Update the last checked release secret
-      if: steps.compare_releases.outputs.new_release == 'true'
-      run: |
-        gh secret set LAST_CHECKED_RELEASE -b"${{ steps.get_latest_release.outputs.latest_release }}" --repo $GITHUB_REPOSITORY
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
