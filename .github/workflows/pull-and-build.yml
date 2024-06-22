@@ -44,3 +44,10 @@ jobs:
     - name: Trigger build if new release is detected
       if: steps.compare_releases.outputs.new_release == 'true'
       run: echo "Trigger your build or workflow here"
+      run: |
+        curl -L -o source.zip https://github.com/graphql/graphql-js/archive/refs/tags/${{ steps.get_latest_source_release.outputs.latest_source_release }}.zip
+        unzip source.zip
+        mv graphql-js-* source
+        cd source
+        npm install
+        npm run build:npm
