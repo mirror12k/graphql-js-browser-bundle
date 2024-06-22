@@ -2,45 +2,76 @@ name: Check for New Releases
 
 on:
   schedule:
-    - cron: '0 0 * * MON'
-  workflow_dispatch:
+    - cron: '0 0 1 * *'
+  push:
 
 jobs:
-  check-releases:
+  rollup-release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
     - name: Check out the repository
       uses: actions/checkout@v2
 
-    - name: Get the latest release
-      id: get_latest_release
+    - name: Get the latest release of source
+      id: get_latest_source_release
       run: |
-        latest_release=$(curl -s https://api.github.com/repos/graphql/graphql-js/releases/latest | jq -r .tag_name)
-        echo "::set-output name=latest_release::$latest_release"
+        latest_source_release=$(curl -s https://api.github.com/repos/graphql/graphql-js/releases/latest | jq -r .tag_name)
+        echo "latest_source_release=$latest_source_release" >> $GITHUB_OUTPUT
 
-    - name: Get the last checked release
-      id: get_last_checked_release
-      run: echo "::set-output name=last_checked_release::${{ secrets.LAST_CHECKED_RELEASE }}"
+    - name: Get the latest release of this repository
+      id: get_latest_own_release
+      run: |
+        latest_own_release=$(curl -s https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r .tag_name)
+        echo "latest_own_release=$latest_own_release" >> $GITHUB_OUTPUT
 
     - name: Compare releases
       id: compare_releases
       run: |
-        if [ "${{ steps.get_latest_release.outputs.latest_release }}" != "${{ steps.get_last_checked_release.outputs.last_checked_release }}" ]; then
+        if [ "${{ steps.get_latest_source_release.outputs.latest_source_release }}" != "${{ steps.get_latest_own_release.outputs.latest_own_release }}" ]; then
           echo "New release detected"
-          echo "::set-output name=new_release::true"
+          echo "new_release=true" >> $GITHUB_OUTPUT
         else
-          echo "No new release"
-          echo "::set-output name=new_release::false"
+          echo "No new release detected"
+          echo "new_release=false" >> $GITHUB_OUTPUT
         fi
 
     - name: Trigger build if new release is detected
       if: steps.compare_releases.outputs.new_release == 'true'
-      run: echo "Trigger your build or workflow here"
-
-    - name: Update the last checked release secret
-      if: steps.compare_releases.outputs.new_release == 'true'
+      id: run_build
       run: |
-        gh secret set LAST_CHECKED_RELEASE -b"${{ steps.get_latest_release.outputs.latest_release }}" --repo YOUR_USERNAME/YOUR_REPOSITORY
+        curl -L -o source.zip https://github.com/graphql/graphql-js/archive/refs/tags/${{ steps.get_latest_source_release.outputs.latest_source_release }}.zip
+        unzip source.zip
+        mv graphql-js-* source
+        cd source
+        npm install --global rollup
+        npm install
+        npm run build:npm
+        cd npmDist
+        rollup index.mjs --format umd --name "graphql" --file ../../graphql.bundle.js
+
+    - name: Create Release
+      if: steps.compare_releases.outputs.new_release == 'true'
+      id: create_release
+      uses: actions/create-release@v1
       env:
-        GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.get_latest_source_release.outputs.latest_source_release }}
+        release_name: Release ${{ steps.get_latest_source_release.outputs.latest_source_release }}
+        draft: false
+        prerelease: false
+
+    - name: Upload Release Asset
+      if: steps.compare_releases.outputs.new_release == 'true'
+      id: upload_release
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./graphql.bundle.js
+        asset_name: graphql.bundle.js
+        asset_content_type: text/javascript
