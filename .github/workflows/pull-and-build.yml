@@ -14,27 +14,31 @@ jobs:
     - name: Check out the repository
       uses: actions/checkout@v2
 
-    - name: Get the latest release of graphql-js
-      id: get_latest_graphql_js_release
+    - name: Get the latest release of source
+      id: get_latest_source_release
       run: |
-        latest_graphql_js_release=$(curl -s https://api.github.com/repos/graphql/graphql-js/releases/latest | jq -r .tag_name)
-        echo "::set-output name=latest_graphql_js_release::$latest_graphql_js_release"
+        latest_source_release=$(curl -s https://api.github.com/repos/graphql/graphql-js/releases/latest | jq -r .tag_name)
+        # echo "::set-output name=latest_source_release::$latest_source_release"
+        echo "latest_source_release=$latest_source_release" >> $GITHUB_OUTPUT
 
     - name: Get the latest release of this repository
       id: get_latest_own_release
       run: |
         latest_own_release=$(curl -s https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r .tag_name)
-        echo "::set-output name=latest_own_release::$latest_own_release"
+        # echo "::set-output name=latest_own_release::$latest_own_release"
+        echo "latest_own_release=$latest_own_release" >> $GITHUB_OUTPUT
 
     - name: Compare releases
       id: compare_releases
       run: |
-        if [ "${{ steps.get_latest_graphql_js_release.outputs.latest_graphql_js_release }}" != "${{ steps.get_latest_own_release.outputs.latest_own_release }}" ]; then
-          echo "New release detected in graphql-js"
-          echo "::set-output name=new_release::true"
+        if [ "${{ steps.get_latest_source_release.outputs.latest_source_release }}" != "${{ steps.get_latest_own_release.outputs.latest_own_release }}" ]; then
+          echo "New release detected"
+          # echo "::set-output name=new_release::true"
+          echo "new_release=true" >> $GITHUB_OUTPUT
         else
-          echo "No new release detected in graphql-js"
-          echo "::set-output name=new_release::false"
+          echo "No new release detected"
+          # echo "::set-output name=new_release::false"
+          echo "new_release=false" >> $GITHUB_OUTPUT
         fi
 
     - name: Trigger build if new release is detected
