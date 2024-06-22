@@ -7,8 +7,10 @@ on:
   push:
 
 jobs:
-  check-releases:
+  rollup-release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
     - name: Check out the repository
@@ -48,5 +50,29 @@ jobs:
         unzip source.zip
         mv graphql-js-* source
         cd source
+        npm install --global rollup
         npm install
         npm run build:npm
+        cd npmDist
+        rollup index.mjs --format umd --name "graphql" --file ../../graphql.bundle.js
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.get_latest_source_release.outputs.latest_source_release }}
+        release_name: Release ${{ steps.get_latest_source_release.outputs.latest_source_release }}
+        draft: false
+        prerelease: false
+
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./graphql.bundle.js
+        asset_name: graphql.bundle.js
+        asset_content_type: text/javascript
