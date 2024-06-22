@@ -1,0 +1,46 @@
+name: Check for New Releases
+
+on:
+  schedule:
+    - cron: '0 0 * * MON'
+  workflow_dispatch:
+
+jobs:
+  check-releases:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check out the repository
+      uses: actions/checkout@v2
+
+    - name: Get the latest release
+      id: get_latest_release
+      run: |
+        latest_release=$(curl -s https://api.github.com/repos/graphql/graphql-js/releases/latest | jq -r .tag_name)
+        echo "::set-output name=latest_release::$latest_release"
+
+    - name: Get the last checked release
+      id: get_last_checked_release
+      run: echo "::set-output name=last_checked_release::${{ secrets.LAST_CHECKED_RELEASE }}"
+
+    - name: Compare releases
+      id: compare_releases
+      run: |
+        if [ "${{ steps.get_latest_release.outputs.latest_release }}" != "${{ steps.get_last_checked_release.outputs.last_checked_release }}" ]; then
+          echo "New release detected"
+          echo "::set-output name=new_release::true"
+        else
+          echo "No new release"
+          echo "::set-output name=new_release::false"
+        fi
+
+    - name: Trigger build if new release is detected
+      if: steps.compare_releases.outputs.new_release == 'true'
+      run: echo "Trigger your build or workflow here"
+
+    - name: Update the last checked release secret
+      if: steps.compare_releases.outputs.new_release == 'true'
+      run: |
+        gh secret set LAST_CHECKED_RELEASE -b"${{ steps.get_latest_release.outputs.latest_release }}" --repo YOUR_USERNAME/YOUR_REPOSITORY
+      env:
+        GH_TOKEN: ${{ secrets.GH_TOKEN }}
