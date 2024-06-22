@@ -42,6 +42,6 @@ jobs:
     - name: Update the last checked release secret
       if: steps.compare_releases.outputs.new_release == 'true'
       run: |
-        gh secret set LAST_CHECKED_RELEASE -b"${{ steps.get_latest_release.outputs.latest_release }}" --repo YOUR_USERNAME/YOUR_REPOSITORY
+        gh secret set LAST_CHECKED_RELEASE -b"${{ steps.get_latest_release.outputs.latest_release }}" --repo $GITHUB_REPOSITORY
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
